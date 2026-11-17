@@ -141,6 +141,7 @@ class FederationAdaptersTest {
         when(collection.updateOne(any(Bson.class), any(Bson.class)))
                 .thenReturn(Mono.just(UpdateResult.acknowledged(1, 1L, null))).thenReturn(Mono.just(UpdateResult.acknowledged(1, 1L, null)))
                 .thenReturn(Mono.just(UpdateResult.acknowledged(0, 0L, null))).thenReturn(Mono.just(UpdateResult.acknowledged(0, 0L, null)));
+        when(collection.countDocuments(any(Bson.class))).thenReturn(Mono.just(0L));
         IdentityProvider provider = provider();
         AuditEntry updated = provider.updateSettings("https://j.example", "c2", "OTHER_SECRET", "openid email", true, "admin");
         AuditEntry enabled = provider.enable("admin");
@@ -213,6 +214,7 @@ class FederationAdaptersTest {
         MongoCollection<FederatedLinkDocument> collection = collectionOf("federated_links", FederatedLinkDocument.class);
         when(collection.updateOne(any(Bson.class), any(Bson.class)))
                 .thenReturn(Mono.just(UpdateResult.acknowledged(1, 1L, null))).thenReturn(Mono.just(UpdateResult.acknowledged(0, 0L, null)));
+        when(collection.countDocuments(any(Bson.class))).thenReturn(Mono.just(0L));
         FederatedLink link = link();
         AuditEntry revoked = link.revoke("admin");
         FederatedLinkMongoRepositoryAdapter adapter = new FederatedLinkMongoRepositoryAdapter(client, "mongodb://localhost/fed_db");
@@ -248,5 +250,29 @@ class FederationAdaptersTest {
         org.mockito.ArgumentCaptor<Bson> filter = org.mockito.ArgumentCaptor.forClass(Bson.class);
         verify(collection, times(2)).findOneAndDelete(filter.capture());
         assertEquals("state-1", render(filter.getAllValues().get(0)).getString("_id").getValue());
+    }
+
+    @Test
+    @DisplayName("a guarded write that matches nothing is a conflict when the document exists; the filter names the status that was read")
+    void guardedWritesConflictWhenTheDocumentExists() {
+        MongoCollection<FederatedLinkDocument> links = collectionOf("federated_links", FederatedLinkDocument.class);
+        when(links.updateOne(any(Bson.class), any(Bson.class))).thenReturn(Mono.just(UpdateResult.acknowledged(0, 0L, null)));
+        when(links.countDocuments(any(Bson.class))).thenReturn(Mono.just(1L));
+        AuditEntry revoked = link().revoke("admin");
+        new FederatedLinkMongoRepositoryAdapter(client, "mongodb://localhost/fed_db");
+        StepVerifier.create(new FederatedLinkMongoRepositoryAdapter(client, "mongodb://localhost/fed_db").updateStatus(id, LinkStatus.REVOKED, revoked))
+                .expectError(com.thinklab.domain.exception.InvalidLinkStatusException.class).verify();
+
+        MongoCollection<IdentityProviderDocument> providers = collectionOf("identity_providers", IdentityProviderDocument.class);
+        when(providers.updateOne(any(Bson.class), any(Bson.class))).thenReturn(Mono.just(UpdateResult.acknowledged(0, 0L, null)));
+        when(providers.countDocuments(any(Bson.class))).thenReturn(Mono.just(1L));
+        AuditEntry enabled = provider().enable("admin");
+        StepVerifier.create(new IdentityProviderMongoRepositoryAdapter(client, "mongodb://localhost/fed_db").updateStatus(id, ProviderStatus.ACTIVE, enabled))
+                .expectError(com.thinklab.domain.exception.InvalidIdentityProviderStatusException.class).verify();
+
+        org.mockito.ArgumentCaptor<Bson> filter = org.mockito.ArgumentCaptor.forClass(Bson.class);
+        verify(links).updateOne(filter.capture(), any(Bson.class));
+        String json = render(filter.getValue()).toJson();
+        assertTrue(json.contains("status") && json.contains("ACTIVE"), json);
     }
 }
