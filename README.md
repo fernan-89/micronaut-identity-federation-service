@@ -70,7 +70,7 @@ Register `THINKLAB_FEDERATION_REDIRECT_URI` (the callback as the browser sees it
 | `ERR-FED-00401` | 401 | The provider refused, or its answer could not be trusted (never says which) |
 | `ERR-FED-00403` | 403 | Authenticated at the provider, but not linked to a user of the organisation |
 | `ERR-FED-00404` | 404 | Provider or link not found (another tenant's answers the same) |
-| `ERR-FED-00409` | 409 | Illegal lifecycle move, duplicate provider/link, or the provider is not enabled |
+| `ERR-FED-00409` | 409 | Illegal lifecycle move, duplicate provider/link, the provider is not enabled, or a change that lost a race with another on the same document (ADR-033) |
 | `ERR-FED-00502` | 502 | The identity provider could not be reached or its discovery document is unusable |
 | `ERR-FED-00503` | 503 | The client secret named by the provider is not configured on the server |
 | `ERR-VALIDATION-00400` | 400 | Payload/header/identifier validation failure |

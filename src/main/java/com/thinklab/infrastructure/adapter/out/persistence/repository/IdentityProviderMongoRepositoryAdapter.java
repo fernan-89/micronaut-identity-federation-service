@@ -6,6 +6,7 @@ import com.mongodb.reactivestreams.client.MongoClient;
 import com.mongodb.reactivestreams.client.MongoCollection;
 import com.thinklab.domain.exception.DuplicateIdentityProviderException;
 import com.thinklab.domain.exception.IdentityProviderNotFoundException;
+import com.thinklab.domain.exception.InvalidIdentityProviderStatusException;
 import com.thinklab.domain.model.AuditEntry;
 import com.thinklab.domain.model.IdentityProvider;
 import com.thinklab.domain.model.IdentityProvider.ProviderStatus;
@@ -69,7 +70,7 @@ public class IdentityProviderMongoRepositoryAdapter implements IdentityProviderR
     @Override
     public Mono<Void> updateSettings(UUID id, String issuer, String clientId, String clientSecretRef, String scopes, boolean autoProvision,
                                      AuditEntry auditEntry) {
-        return executeUpdate(id, Updates.combine(
+        return executeGuarded(id, auditEntry.fromStatus(), Updates.combine(
                 Updates.set("issuer", issuer),
                 Updates.set("clientId", clientId),
                 Updates.set("clientSecretRef", clientSecretRef),
@@ -81,14 +82,25 @@ public class IdentityProviderMongoRepositoryAdapter implements IdentityProviderR
 
     @Override
     public Mono<Void> updateStatus(UUID id, ProviderStatus status, AuditEntry auditEntry) {
-        return executeUpdate(id, Updates.combine(
+        return executeGuarded(id, auditEntry.fromStatus(), Updates.combine(
                 Updates.set("status", status.name()),
                 Updates.set("updatedAt", Instant.now()),
                 Updates.push("auditTrail", AuditEntryDocument.fromDomain(auditEntry))));
     }
 
-    private Mono<Void> executeUpdate(UUID id, Bson update) {
-        return Mono.from(collection().updateOne(Filters.eq("_id", id), update))
-                .flatMap(result -> result.getMatchedCount() == 0 ? Mono.error(new IdentityProviderNotFoundException(id)) : Mono.empty());
+    /** A guarded write (platform race audit): only if the identity provider still has the status the caller read, the {@code fromStatus} of the audit entry. */
+    private Mono<Void> executeGuarded(UUID id, Object fromStatus, Bson update) {
+        Bson filter = Filters.and(Filters.eq("_id", id), Filters.eq("status", String.valueOf(fromStatus)));
+        return Mono.from(collection().updateOne(filter, update))
+                .flatMap(result -> {
+                    if (result.getMatchedCount() > 0) {
+                        return Mono.<Void>empty();
+                    }
+                    return Mono.from(collection().countDocuments(Filters.eq("_id", id)))
+                            .flatMap(count -> count == 0
+                                    ? Mono.<Void>error(new IdentityProviderNotFoundException(id))
+                                    : Mono.<Void>error(new InvalidIdentityProviderStatusException(
+                                            "The identity provider was changed by someone else while this change was being recorded; read it again and retry.")));
+                });
     }
 }

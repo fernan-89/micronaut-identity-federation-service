@@ -7,6 +7,7 @@ import com.mongodb.reactivestreams.client.MongoClient;
 import com.mongodb.reactivestreams.client.MongoCollection;
 import com.thinklab.domain.exception.DuplicateFederatedLinkException;
 import com.thinklab.domain.exception.FederatedLinkNotFoundException;
+import com.thinklab.domain.exception.InvalidLinkStatusException;
 import com.thinklab.domain.model.AuditEntry;
 import com.thinklab.domain.model.FederatedLink;
 import com.thinklab.domain.model.FederatedLink.LinkStatus;
@@ -77,9 +78,22 @@ public class FederatedLinkMongoRepositoryAdapter implements FederatedLinkReposit
     public Mono<Void> updateStatus(UUID id, LinkStatus status, AuditEntry auditEntry) {
         Bson update = Updates.combine(Updates.set("status", status.name()), Updates.set("updatedAt", Instant.now()),
                 Updates.push("auditTrail", AuditEntryDocument.fromDomain(auditEntry)));
-        return Mono.from(collection().updateOne(Filters.eq("_id", id), update))
-                .flatMap(result -> result.getMatchedCount() == 0
-                        ? Mono.error(new FederatedLinkNotFoundException("Federated link " + id + " could not be found."))
-                        : Mono.empty());
+        return executeGuarded(id, auditEntry.fromStatus(), update);
+    }
+
+    /** A guarded write (platform race audit): only if the federated link still has the status the caller read, the {@code fromStatus} of the audit entry. */
+    private Mono<Void> executeGuarded(UUID id, Object fromStatus, Bson update) {
+        Bson filter = Filters.and(Filters.eq("_id", id), Filters.eq("status", String.valueOf(fromStatus)));
+        return Mono.from(collection().updateOne(filter, update))
+                .flatMap(result -> {
+                    if (result.getMatchedCount() > 0) {
+                        return Mono.<Void>empty();
+                    }
+                    return Mono.from(collection().countDocuments(Filters.eq("_id", id)))
+                            .flatMap(count -> count == 0
+                                    ? Mono.<Void>error(new FederatedLinkNotFoundException("Federated link " + id + " could not be found."))
+                                    : Mono.<Void>error(new InvalidLinkStatusException(
+                                            "The federated link was changed by someone else while this change was being recorded; read it again and retry.")));
+                });
     }
 }
