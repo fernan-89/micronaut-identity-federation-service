@@ -17,7 +17,7 @@ public interface IdentityProviderRepository {
     /** Fails with {@code DuplicateIdentityProviderException} when the organisation already has a provider. */
     Mono<IdentityProvider> create(IdentityProvider provider);
 
-    Mono<IdentityProvider> findById(UUID id);
+    Mono<IdentityProvider> findById(UUID id, UUID organisationId);
 
     Mono<IdentityProvider> findByOrganisationId(UUID organisationId);
 

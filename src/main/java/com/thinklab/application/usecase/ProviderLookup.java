@@ -19,8 +19,7 @@ public class ProviderLookup {
     }
 
     public Mono<IdentityProvider> owned(UUID id, UUID organisationId) {
-        return repository.findById(id)
-                .filter(provider -> provider.getOrganisationId().equals(organisationId))
+        return repository.findById(id, organisationId)
                 .switchIfEmpty(Mono.error(new IdentityProviderNotFoundException(id)));
     }
 }

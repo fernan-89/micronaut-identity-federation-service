@@ -19,8 +19,7 @@ public class LinkLookup {
     }
 
     public Mono<FederatedLink> owned(UUID id, UUID organisationId) {
-        return repository.findById(id)
-                .filter(link -> link.getOrganisationId().equals(organisationId))
+        return repository.findById(id, organisationId)
                 .switchIfEmpty(Mono.error(new FederatedLinkNotFoundException("Federated link " + id + " could not be found.")));
     }
 }

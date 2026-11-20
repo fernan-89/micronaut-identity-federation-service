@@ -127,9 +127,9 @@ class FederationAdaptersTest {
                 .thenReturn(Mono.just(IdentityProviderPersistenceMapper.toDocument(provider()))).thenReturn(Mono.empty()).thenReturn(Mono.empty());
         IdentityProviderMongoRepositoryAdapter adapter = new IdentityProviderMongoRepositoryAdapter(client, "mongodb://localhost/fed_db");
 
-        StepVerifier.create(adapter.findById(id)).expectNextMatches(p -> p.getClientId().equals("client")).verifyComplete();
+        StepVerifier.create(adapter.findById(id, UUID.randomUUID())).expectNextMatches(p -> p.getClientId().equals("client")).verifyComplete();
         StepVerifier.create(adapter.findByOrganisationId(tenant)).expectNextMatches(p -> p.getId().equals(id)).verifyComplete();
-        StepVerifier.create(adapter.findById(id)).verifyComplete();
+        StepVerifier.create(adapter.findById(id, UUID.randomUUID())).verifyComplete();
         StepVerifier.create(adapter.findByOrganisationId(tenant)).verifyComplete();
         StepVerifier.create(adapter.findAllByOrganisationId(tenant)).expectNextCount(1).verifyComplete();
     }
@@ -193,9 +193,9 @@ class FederationAdaptersTest {
                 .thenReturn(Mono.just(FederatedLinkPersistenceMapper.toDocument(link()))).thenReturn(Mono.empty()).thenReturn(Mono.empty());
         FederatedLinkMongoRepositoryAdapter adapter = new FederatedLinkMongoRepositoryAdapter(client, "mongodb://localhost/fed_db");
 
-        StepVerifier.create(adapter.findById(id)).expectNextMatches(l -> l.getSubject().equals("sub-1")).verifyComplete();
+        StepVerifier.create(adapter.findById(id, UUID.randomUUID())).expectNextMatches(l -> l.getSubject().equals("sub-1")).verifyComplete();
         StepVerifier.create(adapter.findActive(tenant, "https://i.example", "sub-1")).expectNextMatches(l -> l.getUserId().equals(user)).verifyComplete();
-        StepVerifier.create(adapter.findById(id)).verifyComplete();
+        StepVerifier.create(adapter.findById(id, UUID.randomUUID())).verifyComplete();
         StepVerifier.create(adapter.findActive(tenant, "https://i.example", "nobody")).verifyComplete();
         StepVerifier.create(adapter.findAllByOrganisationId(tenant, LinkStatus.ACTIVE)).expectNextCount(1).verifyComplete();
         StepVerifier.create(adapter.findAllByOrganisationId(tenant, null)).expectNextCount(1).verifyComplete();

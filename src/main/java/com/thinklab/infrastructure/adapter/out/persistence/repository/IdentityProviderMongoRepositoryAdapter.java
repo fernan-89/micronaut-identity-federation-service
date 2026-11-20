@@ -53,8 +53,8 @@ public class IdentityProviderMongoRepositoryAdapter implements IdentityProviderR
     }
 
     @Override
-    public Mono<IdentityProvider> findById(UUID id) {
-        return Mono.from(collection().find(Filters.eq("_id", id)).first()).map(IdentityProviderPersistenceMapper::toDomain);
+    public Mono<IdentityProvider> findById(UUID id, UUID organisationId) {
+        return Mono.from(collection().find(Filters.and(Filters.eq("_id", id), Filters.eq("organisationId", organisationId))).first()).map(IdentityProviderPersistenceMapper::toDomain);
     }
 
     @Override
