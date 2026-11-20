@@ -17,7 +17,7 @@ public interface FederatedLinkRepository {
     /** Fails with {@code DuplicateFederatedLinkException} when the identity or the user already has an ACTIVE link. */
     Mono<FederatedLink> create(FederatedLink link);
 
-    Mono<FederatedLink> findById(UUID id);
+    Mono<FederatedLink> findById(UUID id, UUID organisationId);
 
     /** The ACTIVE link for this external identity, if any. */
     Mono<FederatedLink> findActive(UUID organisationId, String issuer, String subject);

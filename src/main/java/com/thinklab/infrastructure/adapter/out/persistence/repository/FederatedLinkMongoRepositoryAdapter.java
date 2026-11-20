@@ -55,8 +55,8 @@ public class FederatedLinkMongoRepositoryAdapter implements FederatedLinkReposit
     }
 
     @Override
-    public Mono<FederatedLink> findById(UUID id) {
-        return Mono.from(collection().find(Filters.eq("_id", id)).first()).map(FederatedLinkPersistenceMapper::toDomain);
+    public Mono<FederatedLink> findById(UUID id, UUID organisationId) {
+        return Mono.from(collection().find(Filters.and(Filters.eq("_id", id), Filters.eq("organisationId", organisationId))).first()).map(FederatedLinkPersistenceMapper::toDomain);
     }
 
     @Override

@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * The link revoke race against a real MongoDB (platform race audit, ACTION-PLAN 0.5): ten revocations of one federated link at once have exactly one
@@ -60,6 +61,7 @@ class TransitionRaceIT implements TestPropertyProvider {
 
         assertEquals(1, results.stream().filter("OK"::equals).count(), results.toString());
         assertEquals(9, results.stream().filter(InvalidLinkStatusException.class.getSimpleName()::equals).count(), results.toString());
-        assertEquals(2, links.findById(link.id()).block().getAuditTrail().size(), "one entry for linking and one for the single revoke that won");
+        assertEquals(2, links.findById(link.id(), link.organisationId()).block().getAuditTrail().size(), "one entry for linking and one for the single revoke that won");
+        assertNull(links.findById(link.id(), UUID.randomUUID()).block(), "another tenant's link is the same as none");
     }
 }
